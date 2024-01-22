@@ -13,6 +13,8 @@ from random import randint
 from scipy import misc
 from scipy import special
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
 
 
 # =====================
@@ -37,7 +39,7 @@ print('----')
 
 
 class Network:
-
+    #input, hidden, output layers with initially random weights
     def __init__(self, num_hidden):
         self.input_size = 784
         self.output_size = 10
@@ -51,10 +53,13 @@ class Network:
         output_layer = np.random.rand(self.output_size, self.num_hidden + 1) / self.output_size
         self.layers = [hidden_layer, output_layer]
         self.iteration = 0.
+        self.y_true_list = []  # List to store true labels
+        self.y_probs_list = []  # List to store predicted probabilities
 
         print('Initialization with random weight')
         print('-----')
 
+    # training using back propagation, trains until converging(10 iterations of stability)
     def train(self, batchsize, training):
         start_time = time.time()
         print('Network training with '+str(batchsize)+' examples')
@@ -117,6 +122,9 @@ class Network:
             np.dot(np.delete(self.layers[-1], 300, 1).T, output_deltas)
         self.layers[-1] -= c*np.outer(output_deltas, np.append(hidden_outputs, 1))
         self.layers[0] -= c*np.outer(hidden_deltas, np.append(input_vector, 1))
+        self.y_true_list.append(target)
+        predictions = self.feed_forward(input_vector)[-1]
+        self.y_probs_list.append(predictions.tolist())
 
     def predict(self, input_vector):
         return self.feed_forward(input_vector)[-1]
@@ -226,3 +234,37 @@ def aff2(x, *network):
         pred = nt.predict(char)
         print('Prediction = ' + str(np.argmax(pred)))
         print(pred)
+
+
+y_t = np.concatenate(nt1.y_true_list)  # Concatenate true labels
+y_p = np.concatenate(nt1.y_probs_list)  # Concatenate predicted probabilities
+
+
+def generate_roc_curve(y_true, y_probs):
+    """
+    Generate ROC curve for binary classification.
+
+    Parameters:
+    - y_true: true labels (ground truth)
+    - y_probs: predicted probabilities for the positive class
+
+    Returns:
+    - None (plots the ROC curve)
+    """
+    fpr, tpr, thresholds = roc_curve(y_true, y_probs, pos_label=1)
+    roc_auc = auc(fpr, tpr)
+
+    # Plot ROC curve
+    plt.figure(figsize=(8, 8))
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = {:.2f})'.format(roc_auc))
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate (FPR)')
+    plt.ylabel('True Positive Rate (TPR)')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend(loc="lower right")
+    plt.show()
+
+
+generate_roc_curve(y_t, y_p)
